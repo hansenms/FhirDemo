@@ -1,0 +1,475 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "adfName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Name of data factory service. If empty, name will be generated."
+            }
+        },
+        "fhirServerUrl": {
+            "type": "string",
+            "defaultValue": "http://vonk.fhire.ly",
+            "metadata": {
+                "description": "FHIR server URL"
+            }
+        },
+        "aadAuthority": {
+            "type": "string",
+            "defaultValue": "https://login.microsoftonline.com/common",
+            "metadata": {
+                "description": "OAuth Authority for FHIR server"
+            }
+        },
+        "aadClientId": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "AAD client application id for accessing FHIR server"
+            }
+        },
+        "aadClientSecret": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "AAD client secret"
+            }
+        },
+        "aadAudience": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Audience (resource) of the FHIR API app registration"
+            }
+        },
+        "storageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_ZRS"
+            ],
+            "metadata": {
+                "description": "Storage Account type"
+            }
+        },
+        "sqlServerAdminUserName": {
+            "type": "string",
+            "defaultValue": "dbadmin",
+            "metadata": {
+                "description": "Administrator for SQL server"
+            }
+        },
+        "sqlServerAdminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Administrator password for SQL server"
+            }
+        },
+        "adfCustomArtifactsBaseUrl": {
+            "type":"string",
+            "defaultValue": "https://fhirdemo.blob.core.windows.net/adf/",
+            "metadata": {
+                "description": "HTTP location of custom artifacts (activities), etc."
+            }
+        }
+    },
+    "variables": {
+        "adfName": "[if(empty(parameters('adfName')), concat('fhiradf', uniqueString(resourceGroup().id)), parameters('adfName'))]",
+        "storageAccountName": "[concat(toLower(variables('adfName')),'sa')]",
+        "batchAccountName": "[concat(toLower(variables('adfName')),'batch')]",
+        "batchPoolName": "fhirpool1",
+        "sqlServerName": "[concat(toLower(variables('adfName')),'sql')]",
+        "sqlDatabaseName": "fhir",
+        "useAad": "[and(and(not(empty(parameters('aadClientId'))),not(empty(parameters('aadClientSecret')))),not(empty(parameters('aadAudience'))))]",
+        "blobStorageLinkName": "AzureBlobStorage1",
+        "sqlLinkName": "AzureSqlDatabase1",
+        "batchLinkName": "AzureBatch1",
+        "httpServerLinkName": "ArtifactsHttp1",
+        "customExportActivityZip": "publish.zip",
+        "customExportActivityScript": "CustomActivity.ps1",
+        "customActivityZipDatasetName": "customExportActivityZip",
+        "customActivityScriptDatasetName": "customExportActivityScript",
+        "customActivityBlobFolderName": "custom-activity",
+        "customActivityZipBlobDatasetName": "customExportActivityBlobZip",
+        "customActivityScriptBlobDatasetName": "customExportActivityBlobScript",
+        "copyArtifactsPipelineName": "copyArtifacts"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('storageAccountName')]",
+            "apiVersion": "2017-10-01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "[parameters('storageAccountType')]"
+            },
+            "kind": "Storage",
+            "properties": {}
+        },
+        {
+            "name": "[variables('batchAccountName')]",
+            "type": "Microsoft.Batch/batchAccounts",
+            "apiVersion": "2017-09-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+            ],
+            "properties": {
+              "autoStorage": {
+                "storageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+              },
+              "poolAllocationMode": "BatchService"
+            },
+            "resources": []
+          },
+          {
+            "type": "Microsoft.Batch/batchAccounts/pools",
+            "name": "[concat(variables('batchAccountName'), '/', variables('batchPoolName'))]",
+            "apiVersion": "2017-09-01",
+            "scale": null,
+            "properties": {
+                "vmSize": "STANDARD_A1",
+                "interNodeCommunication": "Disabled",
+                "maxTasksPerNode": 1,
+                "taskSchedulingPolicy": {
+                    "nodeFillType": "Spread"
+                },
+                "deploymentConfiguration": {
+                    "virtualMachineConfiguration": {
+                        "imageReference": {
+                            "publisher": "MicrosoftWindowsServer",
+                            "offer": "WindowsServer",
+                            "sku": "2016-Datacenter",
+                            "version": "latest"
+                        },
+                        "nodeAgentSkuId": "batch.node.windows amd64",
+                        "windowsConfiguration": {
+                            "enableAutomaticUpdates": false
+                        }
+                    }
+                },
+                "scaleSettings": {
+                    "fixedScale": {
+                        "targetDedicatedNodes": 1,
+                        "targetLowPriorityNodes": 0,
+                        "resizeTimeout": "PT15M"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Batch/batchAccounts', variables('batchAccountName'))]"
+            ]
+        },
+        {
+            "name": "[variables('sqlServerName')]",
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[resourceGroup().location]",
+            "identity": {
+              "type": "SystemAssigned"
+            },
+            "properties": {
+              "administratorLogin": "[parameters('sqlServerAdminUserName')]",
+              "administratorLoginPassword": "[parameters('sqlServerAdminPassword')]",
+              "version": "12.0"
+            },
+            "resources": [
+                {
+                    "type": "firewallrules",
+                    "apiVersion": "2014-04-01",
+                    "dependsOn": [
+                      "[variables('sqlServerName')]"
+                    ],
+                    "location": "[resourceGroup().location]",
+                    "name": "AllowAllWindowsAzureIps",
+                    "properties": {
+                      "endIpAddress": "0.0.0.0",
+                      "startIpAddress": "0.0.0.0"
+                    }
+                  }          
+            ]
+        },
+        {
+            "type": "Microsoft.Sql/servers/databases",
+            "sku": {
+                "name": "S0",
+                "tier": "Standard"
+            },
+            "kind": "v12.0,user",
+            "name": "[concat(variables('sqlServerName'), '/', variables('sqlDatabaseName'))]",
+            "apiVersion": "2017-03-01-preview",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "collation": "SQL_Latin1_General_CP1_CI_AS",
+                "maxSizeBytes": 268435456000,
+                "catalogCollation": "SQL_Latin1_General_CP1_CI_AS",
+                "zoneRedundant": false
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', variables('sqlServerName'))]"
+            ]
+        },
+        {
+            "name": "[variables('adfName')]",
+            "type": "Microsoft.DataFactory/factories",
+            "apiVersion": "2018-06-01",
+            "location": "[resourceGroup().location]",
+            "identity": {
+              "type": "SystemAssigned"
+            },
+            "properties": {
+            },
+            "resources": []
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('sqlLinkName'))]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureSqlDatabase",
+                "typeProperties": {
+                    "connectionString": "[concat('Data Source=tcp:', reference(resourceId('Microsoft.Sql/servers/', variables('sqlserverName'))).fullyQualifiedDomainName, ',1433;Initial Catalog=', variables('sqlDatabaseName'), ';User Id=', parameters('sqlServerAdminUserName'), '@', variables('sqlServerName'), ';Password=', parameters('sqlServerAdminPassword'), ';')]"
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.DataFactory/factories', variables('adfName'))]",
+                "[resourceId('Microsoft.Sql/servers', variables('sqlServerName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('blobStorageLinkName'))]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBlobStorage",
+                "typeProperties": {
+                    "connectionString": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('storageAccountName'),';AccountKey=',concat(listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')),'2015-05-01-preview').key1))]"
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]",
+                "[resourceId('Microsoft.DataFactory/factories', variables('adfName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('batchLinkName'))]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "AzureBatch",
+                "typeProperties": {
+                    "accountName": "[variables('batchAccountName')]",
+                    "accessKey": {
+                        "type": "SecureString",
+                        "value": "[listKeys(resourceId('Microsoft.Batch/batchAccounts', variables('batchAccountName')), '2017-09-01').primary]"
+                    },
+                    "batchUri": "[concat('https://', variables('batchAccountName'), '.' , resourceGroup().location, '.batch.azure.com')]",
+                    "poolName": "[variables('batchPoolName')]",
+                    "linkedServiceName": {
+                        "referenceName": "[variables('blobStorageLinkName')]",
+                        "type": "LinkedServiceReference"
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Batch/batchAccounts', variables('batchAccountName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('blobStorageLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('httpServerLinkName'))]",
+            "type": "Microsoft.DataFactory/factories/linkedServices",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "annotations": [],
+                "type": "HttpServer",
+                "typeProperties": {
+                    "url": "[parameters('adfCustomArtifactsBaseUrl')]",
+                    "enableServerCertificateValidation": true,
+                    "authenticationType": "Anonymous"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('customActivityZipDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('httpServerLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "HttpFile",
+                "typeProperties": {
+                    "relativeUrl": "[variables('customExportActivityZip')]",
+                    "requestMethod": "Get"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('httpServerLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('customActivityScriptDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('httpServerLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "HttpFile",
+                "typeProperties": {
+                    "relativeUrl": "[variables('customExportActivityScript')]",
+                    "requestMethod": "Get"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('httpServerLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('customActivityZipBlobDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('blobStorageLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "AzureBlob",
+                "typeProperties": {
+                    "fileName": "[variables('customExportActivityZip')]",
+                    "folderPath": "[variables('customActivityBlobFolderName')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('blobStorageLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('customActivityScriptBlobDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('blobStorageLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "AzureBlob",
+                "typeProperties": {
+                    "fileName": "[variables('customExportActivityScript')]",
+                    "folderPath": "[variables('customActivityBlobFolderName')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('blobStorageLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('copyArtifactsPipelineName'))]",
+            "type": "Microsoft.DataFactory/factories/pipelines",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "activities": [
+                    {
+                        "name": "Copy Script",
+                        "type": "Copy",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "HttpSource",
+                                "httpRequestTimeout": "00:01:40"
+                            },
+                            "sink": {
+                                "type": "BlobSink"
+                            },
+                            "enableStaging": false,
+                            "dataIntegrationUnits": 0
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "[variables('customActivityScriptDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "[variables('customActivityScriptBlobDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Copy Zip",
+                        "type": "Copy",
+                        "dependsOn": [],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "HttpSource",
+                                "httpRequestTimeout": "00:01:40"
+                            },
+                            "sink": {
+                                "type": "BlobSink"
+                            },
+                            "enableStaging": false,
+                            "dataIntegrationUnits": 0
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "[variables('customActivityZipDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "[variables('customActivityZipBlobDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ]
+                    }
+                ],
+                "annotations": []
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityScriptDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityScriptBlobDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityZipDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityZipBlobDatasetName'))]"
+            ]
+        }   
+    ]
+}
