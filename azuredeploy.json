@@ -1,0 +1,101 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environmentName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Name of the demo environment. Will be used as prefix for resources."
+            }
+        },
+        "aadAuthority": {
+            "type": "string",
+            "defaultValue": "https://login.microsoftonline.com/common",
+            "metadata": {
+                "description": "OAuth Authority for FHIR server"
+            }
+        },
+        "aadClientId": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "AAD client application id for accessing FHIR server"
+            }
+        },
+        "aadClientSecret": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "AAD client secret"
+            }
+        },
+        "aadAudience": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Audience (resource) of the FHIR API app registration"
+            }
+        },
+        "fhirServerTemplateUrl": {
+            "type": "string",
+            "metadata": {
+                "description": "URL for FHIR Server template"
+            }
+        },
+        "syntheaGeneratorTemplateUrl": {
+            "type": "string",
+            "defaultValue": "https://raw.githubusercontent.com/hansenms/SyntheaACI/master/azuredeploy.json",
+            "metadata": {
+                "description": "URL of Synthea Generator"
+            }
+        }
+    },
+    "variables": {
+        "environmentName": "[if(empty(parameters('environmentName')), concat('fhirdemo', uniqueString(resourceGroup().id)), parameters('environmentName'))]",
+        "fhirServiceName": "[concat(variables('environmentName'),'srvr')]",
+        "syntheaStorageAccountName": "[concat(variables('environmentName'),'synthea')]"
+    },
+    "resources": [
+        {
+            "name": "[concat(variables('fhirServiceName'),'-deploy')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2018-05-01",
+            "properties": {
+                "templateLink": {
+                    "uri": "[parameters('fhirServerTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "serviceName": {
+                        "value": "[variables('fhirServiceName')]"
+                    },
+                    "securityAuthenticationAuthority": {
+                        "value": "[parameters('aadAuthority')]"
+                    },
+                    "securityAuthenticationAudience": {
+                        "value": "[parameters('aadAudience')]"
+                    }
+                },
+                "mode": "incremental"
+            }
+        },
+        {
+            "name": "synthea-generator-deployment",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2018-05-01",
+            "properties": {
+                "templateLink": {
+                    "uri": "[parameters('syntheaGeneratorTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "storageAccountName": {
+                        "value": "[variables('syntheaStorageAccountName')]"
+                    }
+                },
+                "mode": "incremental"
+            }
+        }
+    ]
+}
