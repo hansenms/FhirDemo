@@ -46,7 +46,7 @@
         },
         "batchVmSize": {
             "type": "string",
-            "defaultValue": "Standard_A4_v2",
+            "defaultValue": "Standard_A2_v2",
             "allowedValues": [
                 "Standard_A1_v2",
                 "Standard_A2_v2",
@@ -112,7 +112,9 @@
         "copyArtifactsPipelineName": "copyArtifacts",
         "fhirExportPipeLineName": "FHIRExport",
         "fhirExportBlobFolderName": "fhirexport",
-        "fhirExportPatientBlobName": "patient.json"
+        "fhirExportPatientBlobName": "patient.json",
+        "copyActivityPatientBlobDatasetName": "PatientBlob",
+        "copyActivityPatientSqlDatasetName": "PatientSql"
     },
     "resources": [
         {
@@ -399,7 +401,129 @@
             ]
         },
         {
-            "name": "[concat(variables('adfName'), '/', variables('copyArtifactsPipelineName'))]",
+            "name": "[concat(variables('adfName'), '/', variables('copyActivityPatientBlobDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('blobStorageLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "AzureBlob",
+                "structure": [
+                    {
+                        "name": "id",
+                        "type": "String"
+                    },
+                    {
+                        "name": "gender",
+                        "type": "String"
+                    },
+                    {
+                        "name": "birthDate",
+                        "type": "String"
+                    },
+                    {
+                        "name": "multipleBirth",
+                        "type": "Boolean"
+                    },
+                    {
+                        "name": "lastUpdated",
+                        "type": "String"
+                    },
+                    {
+                        "name": "maritalStatus",
+                        "type": "String"
+                    },
+                    {
+                        "name": "latitute",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "longitude",
+                        "type": "Double"
+                    }
+                ],
+                "typeProperties": {
+                    "format": {
+                        "type": "JsonFormat",
+                        "filePattern": "setOfObjects",
+                        "jsonPathDefinition": {
+                            "id": "$.['id']",
+                            "gender": "$.['gender']",
+                            "birthDate": "$.['birthDate']",
+                            "multipleBirth": "$.['multipleBirthBoolean']",
+                            "lastUpdated": "$.['meta']['lastUpdated']",
+                            "maritalStatus": "$.['maritalStatus']['text']",
+                            "latitute": "$.['address'][0]['extension'][0]['extension'][?(@.url == 'latitude')]['valueDecimal']",
+                            "longitude": "$.['address'][0]['extension'][0]['extension'][?(@.url == 'longitude')]['valueDecimal']",
+                            "SSN": "$.['identifier'][?(@.system == 'http://hl7.org/fhir/sid/us-ssn')]['value']"
+                        }
+                    },
+                    "fileName": "[variables('fhirExportPatientBlobName')]",
+                    "folderPath": "[variables('fhirExportBlobFolderName')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('blobStorageLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('copyActivityPatientSqlDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('sqlLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "annotations": [],
+                "type": "AzureSqlTable",
+                "structure": [
+                    {
+                        "name": "id",
+                        "type": "String"
+                    },
+                    {
+                        "name": "gender",
+                        "type": "String"
+                    },
+                    {
+                        "name": "birthDate",
+                        "type": "DateTime"
+                    },
+                    {
+                        "name": "multipleBirth",
+                        "type": "String"
+                    },
+                    {
+                        "name": "lastUpdated",
+                        "type": "DateTime"
+                    },
+                    {
+                        "name": "maritalStatus",
+                        "type": "String"
+                    },
+                    {
+                        "name": "lattitude",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "longitude",
+                        "type": "Double"
+                    }
+                ],
+                "typeProperties": {
+                    "tableName": "[concat('[', 'dbo].[Patients]')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('sqlLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('fhirExportPipeLineName'))]",
             "type": "Microsoft.DataFactory/factories/pipelines",
             "apiVersion": "2018-06-01",
             "properties": {
@@ -479,27 +603,24 @@
                                 "parameters": {}
                             }
                         ]
-                    }
-                ],
-                "annotations": []
-            },
-            "dependsOn": [
-                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityScriptDatasetName'))]",
-                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityScriptBlobDatasetName'))]",
-                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityZipDatasetName'))]",
-                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityZipBlobDatasetName'))]"
-            ]
-        },
-        {
-            "name": "[concat(variables('adfName'), '/', variables('fhirExportPipeLineName'))]",
-            "type": "Microsoft.DataFactory/factories/pipelines",
-            "apiVersion": "2018-06-01",
-            "properties": {
-                "activities": [
+                    },
                     {
                         "name": "PatientExport",
                         "type": "Custom",
-                        "dependsOn": [],
+                        "dependsOn": [
+                            {
+                                "activity": "Copy Script",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            },
+                            {
+                                "activity": "Copy Zip",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
                         "policy": {
                             "timeout": "7.00:00:00",
                             "retry": 0,
@@ -535,13 +656,79 @@
                             "referenceName": "[variables('batchLinkName')]",
                             "type": "LinkedServiceReference"
                         }
+                    },
+                    {
+                        "name": "ExtractToSql",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "PatientExport",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "source": {
+                                "type": "BlobSource",
+                                "recursive": true
+                            },
+                            "sink": {
+                                "type": "SqlSink",
+                                "writeBatchSize": 10000,
+                                "preCopyScript": "DROP TABLE [dbo].[Patients];\n\nCREATE TABLE [dbo].[Patients](\n\t[id] [varchar](50) NOT NULL,\n\t[gender] [varchar](50) NULL,\n\t[birthDate] [datetime] NULL,\n\t[multipleBirth] [varchar](50) NULL,\n\t[lastUpdated] [datetime] NULL,\n\t[maritalStatus] [varchar](50) NULL,\n\t[lattitude] [float] NULL,\n\t[longitude] [float] NULL\n) ON [PRIMARY];\n"
+                            },
+                            "enableStaging": false,
+                            "dataIntegrationUnits": 0,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "columnMappings": {
+                                    "id": "id",
+                                    "gender": "gender",
+                                    "birthDate": "birthDate",
+                                    "multipleBirth": "multipleBirth",
+                                    "lastUpdated": "lastUpdated",
+                                    "maritalStatus": "maritalStatus",
+                                    "latitute": "lattitude",
+                                    "longitude": "longitude"
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "[variables('copyActivityPatientBlobDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "[variables('copyActivityPatientSqlDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ]
                     }
                 ],
                 "annotations": []
             },
             "dependsOn": [
                 "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('blobStorageLinkName'))]",
-                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('batchLinkName'))]"
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('batchLinkName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivityPatientBlobDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivityPatientSqlDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityScriptDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityScriptBlobDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityZipDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityZipBlobDatasetName'))]"
             ]
         }   
     ]
