@@ -49,12 +49,21 @@
             "metadata": {
                 "description": "URL of Synthea Generator"
             }
+        },
+        "fhirClientTemplateUrl": {
+            "type": "string",
+            "defaultValue": "https://raw.githubusercontent.com/hansenms/FhirClient/master/azure/azuredeploy.json",
+            "metadata": {
+                "description": "URL for FHIR client"
+            }
         }
     },
     "variables": {
         "environmentName": "[if(empty(parameters('environmentName')), concat('fhirdemo', uniqueString(resourceGroup().id)), parameters('environmentName'))]",
         "fhirServiceName": "[concat(variables('environmentName'),'srvr')]",
-        "syntheaStorageAccountName": "[concat(variables('environmentName'),'synthea')]"
+        "fhirServiceUrl": "[concat('https://', variables('fhirServiceName'),'.azurewebsites.net')]",
+        "syntheaStorageAccountName": "[concat(variables('environmentName'),'synthea')]",
+        "fhirClientName": "[concat(variables('environmentName'),'client')]"
     },
     "resources": [
         {
@@ -92,6 +101,44 @@
                 "parameters": {
                     "storageAccountName": {
                         "value": "[variables('syntheaStorageAccountName')]"
+                    }
+                },
+                "mode": "incremental"
+            }
+        },
+        {
+            "name": "[concat(variables('fhirClientName'),'-deploy')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2018-05-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/deployments','synthea-generator-deployment')]"
+            ],
+            "properties": {
+                "templateLink": {
+                    "uri": "[parameters('fhirClientTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "siteName": {
+                        "value": "[variables('fhirclientName')]"
+                    },
+                    "aadAuthority": {
+                        "value": "[parameters('aadAuthority')]"
+                    },
+                    "aadClientId": {
+                        "value": "[parameters('aadClientId')]"
+                    },
+                    "aadClientSecret": {
+                        "value": "[parameters('aadClientSecret')]"
+                    },
+                    "aadAudience": {
+                        "value": "[parameters('aadAudience')]"
+                    },
+                    "reservoirConnectionString": {
+                        "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('syntheaStorageAccountName'),';AccountKey=',concat(listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('syntheaStorageAccountName')),'2015-05-01-preview').key1))]"
+                    },
+                    "fhirServerUrl": {
+                        "value": "[variables('fhirServiceUrl')]"
                     }
                 },
                 "mode": "incremental"
