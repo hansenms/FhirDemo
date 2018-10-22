@@ -54,7 +54,20 @@
             "type": "string",
             "defaultValue": "https://raw.githubusercontent.com/hansenms/FhirClient/master/azure/azuredeploy.json",
             "metadata": {
-                "description": "URL for FHIR client"
+                "description": "URL for FHIR client template"
+            }
+        },
+        "adfTemplateUrl": {
+            "type": "string",
+            "defaultValue": "https://raw.githubusercontent.com/hansenms/FhirDemo/master/adf.json",
+            "metadata": {
+                "description": "URL for Azure Data Factory Template"
+            }
+        },
+        "sqlServerAdminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Administrator password for SQL server in ADF pipeline"
             }
         }
     },
@@ -63,7 +76,8 @@
         "fhirServiceName": "[concat(variables('environmentName'),'srvr')]",
         "fhirServiceUrl": "[concat('https://', variables('fhirServiceName'),'.azurewebsites.net')]",
         "syntheaStorageAccountName": "[concat(variables('environmentName'),'synthea')]",
-        "fhirClientName": "[concat(variables('environmentName'),'client')]"
+        "fhirClientName": "[concat(variables('environmentName'),'client')]",
+        "adfName": "[concat(variables('environmentName'),'adf')]"
     },
     "resources": [
         {
@@ -136,6 +150,43 @@
                     },
                     "reservoirConnectionString": {
                         "value": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('syntheaStorageAccountName'),';AccountKey=',concat(listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('syntheaStorageAccountName')),'2015-05-01-preview').key1))]"
+                    },
+                    "fhirServerUrl": {
+                        "value": "[variables('fhirServiceUrl')]"
+                    }
+                },
+                "mode": "incremental"
+            }
+        },
+        {
+            "name": "[concat(variables('adfName'),'-deploy')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2018-05-01",
+            "dependsOn": [
+            ],
+            "properties": {
+                "templateLink": {
+                    "uri": "[parameters('adfTemplateUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "adfName": {
+                        "value": "[variables('adfName')]"
+                    },
+                    "aadAuthority": {
+                        "value": "[parameters('aadAuthority')]"
+                    },
+                    "aadClientId": {
+                        "value": "[parameters('aadClientId')]"
+                    },
+                    "aadClientSecret": {
+                        "value": "[parameters('aadClientSecret')]"
+                    },
+                    "aadAudience": {
+                        "value": "[parameters('aadAudience')]"
+                    },
+                    "sqlServerAdminPassword": {
+                        "value": "[parameters('sqlServerAdminPassword')]"
                     },
                     "fhirServerUrl": {
                         "value": "[variables('fhirServiceUrl')]"
