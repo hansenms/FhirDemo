@@ -104,9 +104,23 @@
             }
         },
         {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('syntheaStorageAccountName')]",
+            "apiVersion": "2017-10-01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "kind": "Storage",
+            "properties": {}
+        },
+        {
             "name": "synthea-generator-deployment",
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2018-05-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('syntheaStorageAccountName'))]"
+            ],
             "properties": {
                 "templateLink": {
                     "uri": "[parameters('syntheaGeneratorTemplateUrl')]",
@@ -125,7 +139,7 @@
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2018-05-01",
             "dependsOn": [
-                "[resourceId('Microsoft.Resources/deployments','synthea-generator-deployment')]"
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('syntheaStorageAccountName'))]"
             ],
             "properties": {
                 "templateLink": {
