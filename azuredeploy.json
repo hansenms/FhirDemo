@@ -7,7 +7,8 @@
             "defaultValue": "",
             "metadata": {
                 "description": "Name of the demo environment. Will be used as prefix for resources."
-            }
+            },
+            "maxLength": 12
         },
         "aadAuthority": {
             "type": "string",
