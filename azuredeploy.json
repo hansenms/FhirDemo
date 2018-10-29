@@ -38,6 +38,20 @@
                 "description": "Audience (resource) of the FHIR API app registration"
             }
         },
+        "aadServiceClientId": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "AAD service client application id for accessing FHIR server"
+            }
+        },
+        "aadServiceClientSecret": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "AAD service client secret"
+            }
+        },
         "fhirServerTemplateUrl": {
             "type": "string",
             "metadata": {
@@ -192,10 +206,10 @@
                         "value": "[parameters('aadAuthority')]"
                     },
                     "aadClientId": {
-                        "value": "[parameters('aadClientId')]"
+                        "value": "[parameters('aadServiceClientId')]"
                     },
                     "aadClientSecret": {
-                        "value": "[parameters('aadClientSecret')]"
+                        "value": "[parameters('aadServiceClientSecret')]"
                     },
                     "aadAudience": {
                         "value": "[parameters('aadAudience')]"

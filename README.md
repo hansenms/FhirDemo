@@ -1,17 +1,21 @@
 # FHIR in Azure Demo
 
-This repository contains templates for deploying a [FHIR](https://hl7.org/fhir) demo in Azure.
+This repository contains templates for deploying a [FHIR](https://hl7.org/fhir) demo in Azure. The demo environment contains a FHIR server, a simple web client for interacting with the server, and an Azure Data Factory export pipeline:
+
+![FHIR Demo Architecture](architecture.png)
+
 
 The demo can be deployed with PowerShell or using the Azure Portal. 
 
 ## Prerequisites
 
-The FHIR Server uses Azure Active Directory (AAD) for OAuth authentication. You need to register two applications in Azure Active Directory:
+The FHIR Server uses Azure Active Directory (AAD) for OAuth authentication. You need to register three (3) applications in Azure Active Directory:
 
 1. An application registration for the FHIR API. This application will define the "AppRoles" that a user or application can have. 
-2. A client application registration for use with the demo web client. In the demo case we will also grant this application registration an AppRole to allow enable it to be used for automation using Data Factory.
+2. A client application registration for use with the demo web client.
+3. A service client application registration, which willl be granted an AppRole to allow enable it to be used for automation using Data Factory.
 
-You can create both of these applications using the Azure Portal or you can use PowerShell.
+You can create all three of these applications using the Azure Portal or you can use PowerShell.
 
 This repository contains a [convenience script](PrepareFhirDemo.ps1) that you can use to set up AAD app registrations:
 
@@ -25,10 +29,12 @@ The `$environmentParams` variable will contain the settings needed to deploy the
 Name                           Value
 ----                           -----
 aadClientId                    a0d09b67-XXXX-XXXX-XXXX-5ce34fb78bb1aad
-Audience                       https:/demoenvname.azurewebsites.net
 aadClientSecret                TTMCUfBXXXXXXXXXXXXXXXXXXXX3pxm9Jw2q5QwOXpc=
+aadServiceClientId             12309b67-XXXX-XXXX-XXXX-5ce34fb78bb1234
+aadServiceClientSecret         YYYYYYXXXXXXXXXXXXXXXXXXXXY3pxm9Jw2q5QwOXUU=
+Audience                       https:/demoenvname.azurewebsites.net
 environmentName                demoenvname
-aadAuthority                    https://login.microsoftonline.com/0b471a55-XXXX-XXXX-XXXX-6c9b756101c3
+aadAuthority                   https://login.microsoftonline.com/0b471a55-XXXX-XXXX-XXXX-6c9b756101c3
 ```
 
 To deploy the demo:

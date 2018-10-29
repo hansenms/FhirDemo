@@ -23,16 +23,19 @@ $aadUser = Get-AzureADUser -Filter "startswith(userPrincipalName, '$username') o
 
 $fhirServiceName = $environmentName + "srvr"
 $fhirClientName = $environmentName + "client"
+$fhirServiceClientName = $environmentName + "service"
+
 $fhirServerUrl = "https://" + $fhirServiceName + ".azurewebsites.net"
 $fhirClientUrl = "https://" + $fhirClientName + ".azurewebsites.net"
 $fhirClientReplyUrl = $fhirClientUrl + "/.auth/login/aad/callback"
 
 $apiAppReg = New-FhirServerApiApplicationRegistration -FhirServiceName $fhirServiceName -AppRoles admin
 $clientAppReg = New-FhirServerClientApplicationRegistration -ApiAppId $apiAppReg.AppId -DisplayName $fhirClientName -IdentifierUri $fhirClientUrl -ReplyUrl $fhirClientReplyUrl
+$serviceClientAppReg = New-FhirServerClientApplicationRegistration -ApiAppId $apiAppReg.AppId -DisplayName $fhirServiceClientName 
 
 # Make the app registration an admin, since we will be using it for data movement
 # This could be a separate service principal
-Set-FhirServerClientAppRoleAssignments -AppId $clientAppReg.AppId -ApiAppId $apiAppReg.AppId -AppRoles admin
+Set-FhirServerClientAppRoleAssignments -AppId $serviceClientAppReg.AppId -ApiAppId $apiAppReg.AppId -AppRoles admin
 
 # Make the current user an admin
 Set-FhirServerUserAppRoleAssignments -UserPrincipalName $aadUser.UserPrincipalName -ApiAppId $apiAppReg.AppId -AppRoles admin
@@ -43,4 +46,6 @@ Set-FhirServerUserAppRoleAssignments -UserPrincipalName $aadUser.UserPrincipalNa
     aadClientId  = $clientAppReg.AppId;
     aadClientSecret = $clientAppReg.AppSecret;
     aadAudience  = $apiAppReg.Audience;
+    aadServiceClientId = $serviceClientAppReg.AppId;
+    aadServiceClientSecret = $serviceClientAppReg.AppSecret
 }
