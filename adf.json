@@ -113,8 +113,15 @@
         "fhirExportPipeLineName": "FHIRExport",
         "fhirExportBlobFolderName": "fhirexport",
         "fhirExportPatientBlobName": "patient.json",
+        "fhirExportWeightBlobName": "weight.json",
+        "fhirExportHeightBlobName": "height.json",
         "copyActivityPatientBlobDatasetName": "PatientBlob",
-        "copyActivityPatientSqlDatasetName": "PatientSql"
+        "copyActivityWeightBlobDatasetName": "WeightBlob",
+        "copyActivityHeightBlobDatasetName": "HeightBlob",
+        "copyActivityPatientSqlDatasetName": "PatientSql",
+        "copyActivityWeightSqlDatasetName": "WeightSql",
+        "copyActivityHeightSqlDatasetName": "HeightSql",
+        "copyActivitySummarySqlDatasetName": "PatientSummarySql"
     },
     "resources": [
         {
@@ -152,7 +159,7 @@
             "properties": {
                 "vmSize": "[parameters('batchVmSize')]",
                 "interNodeCommunication": "Disabled",
-                "maxTasksPerNode": 1,
+                "maxTasksPerNode": 4,
                 "taskSchedulingPolicy": {
                     "nodeFillType": "Spread"
                 },
@@ -523,6 +530,234 @@
             ]
         },
         {
+            "name": "[concat(variables('adfName'), '/', variables('copyActivityHeightBlobDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('blobStorageLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "type": "AzureBlob",
+                "structure": [
+                    {
+                        "name": "id",
+                        "type": "String"
+                    },
+                    {
+                        "name": "issued",
+                        "type": "String"
+                    },
+                    {
+                        "name": "valueQuantity.value",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "valueQuantity.unit",
+                        "type": "String"
+                    },
+                    {
+                        "name": "subject.reference",
+                        "type": "String"
+                    }
+                ],
+                "typeProperties": {
+                    "format": {
+                        "type": "JsonFormat",
+                        "filePattern": "setOfObjects",
+                        "jsonPathDefinition": {
+                            "id": "$.['id']",
+                            "issued": "$.['issued']",
+                            "valueQuantity.value": "$.['valueQuantity']['value']",
+                            "valueQuantity.unit": "$.['valueQuantity']['unit']",
+                            "subject.reference": "$.['subject']['reference']"
+                        }
+                    },
+                    "fileName": "[variables('fhirExportHeightBlobName')]",
+                    "folderPath": "[variables('fhirExportBlobFolderName')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('blobStorageLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('copyActivityHeightSqlDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('sqlLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "type": "AzureSqlTable",
+                "structure": [
+                    {
+                        "name": "id",
+                        "type": "String"
+                    },
+                    {
+                        "name": "subject",
+                        "type": "String"
+                    },
+                    {
+                        "name": "height",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "unit",
+                        "type": "String"
+                    },
+                    {
+                        "name": "issued",
+                        "type": "DateTime"
+                    }
+                ],
+                "typeProperties": {
+                    "tableName": "[concat('[', 'dbo].[Height]')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('sqlLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('copyActivityWeightSqlDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('sqlLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "type": "AzureSqlTable",
+                "structure": [
+                    {
+                        "name": "id",
+                        "type": "String"
+                    },
+                    {
+                        "name": "subject",
+                        "type": "String"
+                    },
+                    {
+                        "name": "weight",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "unit",
+                        "type": "String"
+                    },
+                    {
+                        "name": "issued",
+                        "type": "DateTime"
+                    }
+                ],
+                "typeProperties": {
+                    "tableName": "[concat('[', 'dbo].[Weight]')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('sqlLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('copyActivitySummarySqlDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('sqlLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "type": "AzureSqlTable",
+                "structure": [
+                    {
+                        "name": "patientId",
+                        "type": "String"
+                    },
+                    {
+                        "name": "ageYears",
+                        "type": "Int16"
+                    },
+                    {
+                        "name": "lattitude",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "longitude",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "weight",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "height",
+                        "type": "Double"
+                    }
+                ],
+                "typeProperties": {
+                    "tableName": "[concat('[', 'dbo].[PatientSummary]')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('sqlLinkName'))]"
+            ]
+        },
+        {
+            "name": "[concat(variables('adfName'), '/', variables('copyActivityWeightBlobDatasetName'))]",
+            "type": "Microsoft.DataFactory/factories/datasets",
+            "apiVersion": "2018-06-01",
+            "properties": {
+                "linkedServiceName": {
+                    "referenceName": "[variables('blobStorageLinkName')]",
+                    "type": "LinkedServiceReference"
+                },
+                "type": "AzureBlob",
+                "structure": [
+                    {
+                        "name": "id",
+                        "type": "String"
+                    },
+                    {
+                        "name": "subject",
+                        "type": "String"
+                    },
+                    {
+                        "name": "issued",
+                        "type": "String"
+                    },
+                    {
+                        "name": "valueQuantity.value",
+                        "type": "Double"
+                    },
+                    {
+                        "name": "valueQuantity.unit",
+                        "type": "String"
+                    }
+                ],
+                "typeProperties": {
+                    "format": {
+                        "type": "JsonFormat",
+                        "filePattern": "setOfObjects",
+                        "jsonPathDefinition": {
+                            "id": "$.['id']",
+                            "subject": "$.['subject']['reference']",
+                            "issued": "$.['issued']",
+                            "valueQuantity.value": "$.['valueQuantity']['value']",
+                            "valueQuantity.unit": "$.['valueQuantity']['unit']"
+                        }
+                    },
+                    "fileName": "[variables('fhirExportWeightBlobName')]",
+                    "folderPath": "[variables('fhirExportBlobFolderName')]"
+                }
+            },
+            "dependsOn": [
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('blobStorageLinkName'))]"
+            ]
+        },
+        {
             "name": "[concat(variables('adfName'), '/', variables('fhirExportPipeLineName'))]",
             "type": "Microsoft.DataFactory/factories/pipelines",
             "apiVersion": "2018-06-01",
@@ -658,7 +893,114 @@
                         }
                     },
                     {
-                        "name": "ExtractToSql",
+                        "name": "WeightExport",
+                        "type": "Custom",
+                        "dependsOn": [
+                            {
+                                "activity": "Copy Script",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            },
+                            {
+                                "activity": "Copy Zip",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "command": "PowerShell -File .\\CustomActivity.ps1",
+                            "resourceLinkedService": {
+                                "referenceName": "[variables('blobStorageLinkName')]",
+                                "type": "LinkedServiceReference"
+                            },
+                            "folderPath": "[variables('customActivityBlobFolderName')]",
+                            "referenceObjects": {
+                                "linkedServices": [],
+                                "datasets": []
+                            },
+                            "extendedProperties": {
+                                "AzureAD_Authority": "[parameters('aadAuthority')]",
+                                "AzureAD_ClientId": "[parameters('aadClientId')]",
+                                "AzureAD_ClientSecret": "[parameters('aadClientSecret')]",
+                                "AzureAD_Audience": "[parameters('aadAudience')]",
+                                "StorageConnectionString": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('storageAccountName'),';AccountKey=',concat(listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')),'2015-05-01-preview').key1))]",
+                                "BlobFolder": "[variables('fhirExportBlobFolderName')]",
+                                "FhirServerUrl": "[parameters('fhirServerUrl')]",
+                                "FhirQuery": "/Observation?code=29463-7&_count=100",
+                                "OutputFile": "[variables('fhirExportWeightBlobName')]"              
+                            }
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "[variables('batchLinkName')]",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    
+                    {
+                        "name": "HeightExport",
+                        "type": "Custom",
+                        "dependsOn": [
+                            {
+                                "activity": "Copy Script",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            },
+                            {
+                                "activity": "Copy Zip",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "userProperties": [],
+                        "typeProperties": {
+                            "command": "PowerShell -File .\\CustomActivity.ps1",
+                            "resourceLinkedService": {
+                                "referenceName": "[variables('blobStorageLinkName')]",
+                                "type": "LinkedServiceReference"
+                            },
+                            "folderPath": "[variables('customActivityBlobFolderName')]",
+                            "referenceObjects": {
+                                "linkedServices": [],
+                                "datasets": []
+                            },
+                            "extendedProperties": {
+                                "AzureAD_Authority": "[parameters('aadAuthority')]",
+                                "AzureAD_ClientId": "[parameters('aadClientId')]",
+                                "AzureAD_ClientSecret": "[parameters('aadClientSecret')]",
+                                "AzureAD_Audience": "[parameters('aadAudience')]",
+                                "StorageConnectionString": "[concat('DefaultEndpointsProtocol=https;AccountName=',variables('storageAccountName'),';AccountKey=',concat(listKeys(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName')),'2015-05-01-preview').key1))]",
+                                "BlobFolder": "[variables('fhirExportBlobFolderName')]",
+                                "FhirServerUrl": "[parameters('fhirServerUrl')]",
+                                "FhirQuery": "/Observation?code=8302-2&_count=100",
+                                "OutputFile": "[variables('fhirExportHeightBlobName')]"              
+                            }
+                        },
+                        "linkedServiceName": {
+                            "referenceName": "[variables('batchLinkName')]",
+                            "type": "LinkedServiceReference"
+                        }
+                    },
+                    {
+                        "name": "PatientToSql",
                         "type": "Copy",
                         "dependsOn": [
                             {
@@ -716,6 +1058,187 @@
                                 "parameters": {}
                             }
                         ]
+                    },
+                    {
+                        "name": "HeightToSql",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "HeightExport",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "typeProperties": {
+                            "source": {
+                                "type": "BlobSource",
+                                "recursive": true
+                            },
+                            "sink": {
+                                "type": "SqlSink",
+                                "writeBatchSize": 10000,
+                                "preCopyScript": "DROP TABLE [dbo].[Height];\n\nCREATE TABLE [dbo].[Height](\n\t[id] [varchar](50) NOT NULL,\n\t[subject] [varchar](50) NULL,\n\t[height] [float] NULL,\n\t[unit] [varchar](50) NULL,\n        [issued] [datetime] NULL\n) ON [PRIMARY];\n"
+                            },
+                            "enableStaging": false,
+                            "dataIntegrationUnits": 0,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "columnMappings": {
+                                    "id": "id",
+                                    "subject.reference": "subject",
+                                    "valueQuantity.value": "height",
+                                    "valueQuantity.unit": "unit",
+                                    "issued": "issued"
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "[variables('copyActivityHeightBlobDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "[variables('copyActivityHeightSqlDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ]
+                    },
+                    {
+                        "name": "WeightToSql",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "WeightExport",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "typeProperties": {
+                            "source": {
+                                "type": "BlobSource",
+                                "recursive": true
+                            },
+                            "sink": {
+                                "type": "SqlSink",
+                                "writeBatchSize": 10000,
+                                "preCopyScript": "DROP TABLE [dbo].[Weight];\n\nCREATE TABLE [dbo].[Weight](\n\t[id] [varchar](50) NOT NULL,\n\t[subject] [varchar](50) NULL,\n\t[weight] [float] NULL,\n\t[unit] [varchar](50) NULL,\n        [issued] [datetime] NULL\n) ON [PRIMARY];\n"
+                            },
+                            "enableStaging": false,
+                            "dataIntegrationUnits": 0,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "columnMappings": {
+                                    "id": "id",
+                                    "subject": "subject",
+                                    "valueQuantity.value": "weight",
+                                    "valueQuantity.unit": "unit",
+                                    "issued": "issued"
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "[variables('copyActivityWeightBlobDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "[variables('copyActivityWeightSqlDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ]
+                    },
+                    {
+                        "name": "PatientSummary",
+                        "type": "Copy",
+                        "dependsOn": [
+                            {
+                                "activity": "PatientToSql",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            },
+                            {
+                                "activity": "HeightToSql",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            },
+                            {
+                                "activity": "WeightToSql",
+                                "dependencyConditions": [
+                                    "Succeeded"
+                                ]
+                            }
+                        ],
+                        "policy": {
+                            "timeout": "7.00:00:00",
+                            "retry": 0,
+                            "retryIntervalInSeconds": 30,
+                            "secureOutput": false,
+                            "secureInput": false
+                        },
+                        "typeProperties": {
+                            "source": {
+                                "type": "SqlSource",
+                                "sqlReaderQuery": "DECLARE @LatestWeight table \n( \n   id varchar(50), \n   subject varchar(50), \n   weight float \n)\n\nDECLARE @LatestHeight table \n( \n   id varchar(50), \n   subject varchar(50), \n   height float \n)\n\n;WITH w AS\n(\n   SELECT *,\n         ROW_NUMBER() OVER (PARTITION BY subject ORDER BY issued DESC) AS rn\n   FROM Weight\n)\nINSERT INTO @LatestWeight \nSELECT w.id, w.subject, w.weight\nFROM w\nWHERE rn = 1\n\n;WITH h AS\n(\n   SELECT *,\n         ROW_NUMBER() OVER (PARTITION BY subject ORDER BY issued DESC) AS rn\n   FROM Height\n)\nINSERT INTO @LatestHeight \nSELECT h.id, h.subject, h.height\nFROM h\nWHERE rn = 1\n\nSELECT Patients.id AS patientId, DATEDIFF(hour, Patients.birthDate, GETDATE())/8766 AS ageYears, Patients.lattitude, Patients.longitude, [@LatestWeight].weight, [@LatestHeight].height  FROM Patients\nINNER JOIN @LatestHeight ON [@LatestHeight].subject LIKE '%'+Patients.id+'%' \nINNER JOIN @LatestWeight ON [@LatestWeight].subject LIKE '%'+Patients.id+'%' "
+                            },
+                            "sink": {
+                                "type": "SqlSink",
+                                "writeBatchSize": 10000,
+                                "preCopyScript": "DROP TABLE [dbo].[PatientSummary];\n\nCREATE TABLE [dbo].[PatientSummary](\n\t[patientId] [varchar](50) NOT NULL,\n\t[ageYears] [int] NULL,\n\t[height] [float] NULL,\n\t[weight] [float] NULL,\n\t[lattitude] [float] NULL,\n\t[longitude] [float] NULL,\n) ON [PRIMARY];\n"
+                            },
+                            "enableStaging": false,
+                            "dataIntegrationUnits": 0,
+                            "translator": {
+                                "type": "TabularTranslator",
+                                "columnMappings": {
+                                    "patientId": "patientId",
+                                    "ageYears": "ageYears",
+                                    "lattitude": "lattitude",
+                                    "longitude": "longitude",
+                                    "weight": "weight",
+                                    "height": "height"
+                                }
+                            }
+                        },
+                        "inputs": [
+                            {
+                                "referenceName": "[variables('copyActivitySummarySqlDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "referenceName": "[variables('copyActivitySummarySqlDatasetName')]",
+                                "type": "DatasetReference",
+                                "parameters": {}
+                            }
+                        ]
                     }
                 ],
                 "annotations": []
@@ -723,6 +1246,11 @@
             "dependsOn": [
                 "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('blobStorageLinkName'))]",
                 "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/linkedServices/', variables('batchLinkName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivityWeightBlobDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivityWeightSqlDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivityHeightBlobDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivityHeightSqlDatasetName'))]",
+                "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivitySummarySqlDatasetName'))]",
                 "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivityPatientBlobDatasetName'))]",
                 "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('copyActivityPatientSqlDatasetName'))]",
                 "[concat(resourceId('Microsoft.DataFactory/factories', variables('adfName')), '/datasets/', variables('customActivityScriptDatasetName'))]",
