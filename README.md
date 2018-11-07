@@ -13,7 +13,7 @@ The FHIR Server uses Azure Active Directory (AAD) for OAuth authentication. You 
 
 1. An application registration for the FHIR API. This application will define the "AppRoles" that a user or application can have. 
 2. A client application registration for use with the demo web client.
-3. A service client application registration, which willl be granted an AppRole to allow enable it to be used for automation using Data Factory.
+3. A service client application registration, which will be granted an AppRole to allow it to be used for automation using Data Factory.
 
 You can create all three of these applications using the Azure Portal or you can use PowerShell.
 
