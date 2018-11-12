@@ -42,8 +42,7 @@ To deploy the demo:
 ```PowerShell
 rg = New-AzureRmResourceGroup -Name $environmentParams.environmentName -Location westus2
 
-New-AzureRmResourceGroupDeployment -TemplateFile .\azuredeploy.json -TemplateParameterObject $environmentParams -ResourceGroupName $rg.ResourceGroupName -fhirServerTemplateUrl https://url-for-fhir-server/azuredeploy.json
-
+New-AzureRmResourceGroupDeployment -TemplateFile .\azuredeploy.json -TemplateParameterObject $environmentParams -ResourceGroupName $rg.ResourceGroupName
 ```
 
 Or use the button below:

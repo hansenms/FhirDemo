@@ -54,6 +54,7 @@
         },
         "fhirServerTemplateUrl": {
             "type": "string",
+            "defaultValue": "https://raw.githubusercontent.com/Microsoft/fhir-server/master/samples/templates/default-azuredeploy.json",
             "metadata": {
                 "description": "URL for FHIR Server template"
             }
