@@ -61,7 +61,7 @@ $environmentParams = (Get-Content .\environment.json | ConvertFrom-Json)
 ## Deployment
 
 ```PowerShell
-rg = New-AzureRmResourceGroup -Name $environmentParams.environmentName -Location westus2
+$rg = New-AzureRmResourceGroup -Name $environmentParams.environmentName -Location westus2
 
 New-AzureRmResourceGroupDeployment -TemplateFile .\azuredeploy.json -TemplateParameterObject $environmentParams -ResourceGroupName $rg.ResourceGroupName
 ```
