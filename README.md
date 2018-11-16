@@ -71,3 +71,17 @@ Or use the button below:
 <a href="https://transmogrify.azurewebsites.net/azuredeploy.json" target="_blank">
     <img src="http://azuredeploy.net/deploybutton.png"/>
 </a>
+
+## Clean Up
+
+Delete the Resource Group:
+
+```PowerShell
+Remove-AzureRmResourceGroup -Name $rg.ResourceGroupName
+```
+
+Remove AAD Application Registrations
+
+```PowerShell
+ .\DeleteEnvironmentAppRegistrations.ps1 -EnvironmentName $environmentParams.environmentName
+```
